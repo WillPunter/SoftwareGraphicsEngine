@@ -18,5 +18,6 @@ void system_window_set_shown (system_window_t *window, bool shown);
 bool system_window_bind_event_table (system_window_t *window, system_event_table_t et);
 bool system_window_bind_event (system_window_t *window, system_event_code_t event, system_event_handler_t callback);
 void system_window_handle_events (system_window_t *window);
+void system_window_render_buffer_to_screen (system_window_t *window, void *buffer);
 
 #endif

@@ -10,7 +10,6 @@
 struct system_window_t;
 typedef struct system_window_t system_window_t;
 
-
 typedef enum  {
     SYSTEM_EVENT_NONE,
     SYSTEM_EVENT_EXIT

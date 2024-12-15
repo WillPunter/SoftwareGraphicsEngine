@@ -8,6 +8,9 @@ struct system_window_t  {
     int screen;                       /* Handle for a screen to render to. */
     Window window;                    /* Handle to the window to render to. */
     system_event_table_t event_table; /* Event table */
+    XImage *framebuffer;              /* RGB buffer */
+    unsigned int width;               /* Width in pixels */
+    unsigned int height;              /* Height in pixels*/
 };
 
 /* Handle for a connection to the X server
@@ -84,11 +87,18 @@ system_window_t *system_window_create (
     /* Set window name / title */
     XStoreName (x_server_connection, window->window, name);
 
+    /* Set window dimensions */
+    window->width = width;
+    window->height = height;
+
     /* Set up events*/
     XSetWMProtocols (x_server_connection, window->window, &wm_delete_window, 1);
     XSelectInput (x_server_connection, window->window, ExposureMask | KeyPressMask | ButtonPressMask | StructureNotifyMask | ClientMessage);
 
-    /* Flush X serve commands from this connection.
+    /* Create framebuffer */
+    window->framebuffer = XCreateImage (x_server_connection, DefaultVisual (x_server_connection, window->screen), DefaultDepth (x_server_connection, window->screen), ZPixmap, 0, NULL, window->width, window->height, 32, 0);
+
+    /* Flush X server commands from this connection.
        The X server handles all currently open windows
        for the OS, so it is important that its queue
        is flushed for this connection specifically in
@@ -186,3 +196,8 @@ static void dispatch_event (
         window->event_table[event_code](window, NULL, NULL);
     }
 }
+
+void system_window_render_buffer_to_screen (system_window_t *window, void *buffer) {
+    window->framebuffer->data = buffer;
+    XPutImage (x_server_connection, window->window, DefaultGC (x_server_connection, window->screen), window->framebuffer, 0, 0, 0, 0, window->width, window->height);
+};
