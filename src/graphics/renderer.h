@@ -5,9 +5,9 @@
 #include <stdint.h>
 
 typedef struct {
-    uint8_t red;
-    uint8_t green;
     uint8_t blue;
+    uint8_t green;
+    uint8_t red;
     uint8_t pad;
 } graphics_pixel_t;
 
@@ -19,5 +19,7 @@ typedef struct {
 
 graphics_renderer_t *graphics_renderer_init (unsigned int width, unsigned int height);
 void graphics_renderer_display (graphics_renderer_t *renderer, system_window_t *window);
+void graphics_renderer_clear_buffer (graphics_renderer_t *renderer);
+void graphics_renderer_draw_pixel (graphics_renderer_t *renderer, int x, int y, uint8_t red, uint8_t green, uint8_t blue);
 
 #endif

@@ -31,17 +31,23 @@ int main () {
     uint32_t y = 0;
 
     while (is_running) {
+        graphics_renderer_clear_buffer (renderer);
+
         intensity = (intensity + 1) % 255;
 
-        renderer->pixels[640 * y + x].red += 10;
-        renderer->pixels[640 * y + x].green += 30;
-        renderer->pixels[640 * y + x].blue += 50; 
+        renderer->pixels[640 * y + x].red = 255;
+        renderer->pixels[640 * y + x].green = 0;
+        renderer->pixels[640 * y + x].blue = 0; 
 
         x = x + 1;
 
         if (x >= 640) {
             x = 0;
             y = (y + 1) % 480;
+        }
+
+        for (int i = 0; i < 100; i++) {
+            renderer->pixels[640 * 400 + i].blue = 255;
         }
 
         graphics_renderer_display (renderer, window); 
