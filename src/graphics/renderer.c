@@ -256,8 +256,8 @@ void graphics_renderer_draw_shaded_triangle (graphics_renderer_t *renderer, int 
         double b_0_1 = (b_1 - b_0) / (double) dy_0_1;
         double b_0_2 = (b_2 - b_0) / (double) dy_0_2;
     
-        for (int i = y0; i <= y1; i++) {
-            draw_horizontal_line_shaded (renderer, (int) p1_x, (int) p2_x, i, p1_r, p1_g, p1_b, p2_r, p2_g, p2_b);
+        for (int i = y0; i < y1; i++) {
+            draw_horizontal_line_shaded (renderer, (int) p1_x, (int) p2_x, i, (uint8_t) p1_r, (uint8_t) p1_g, (uint8_t) p1_b, (uint8_t) p2_r, (uint8_t) p2_g, (uint8_t) p2_b);
             
             p1_x += x_0_1;
             p1_r += r_0_1;
@@ -291,7 +291,7 @@ void graphics_renderer_draw_shaded_triangle (graphics_renderer_t *renderer, int 
         double b_0_2 = (b_2 - b_0) / (double) dy_0_2;
     
         for (int i = y1; i <= y2; i++) {
-            draw_horizontal_line_shaded (renderer, (int) p1_x, (int) p2_x, i, p1_r, p1_g, p1_b, p2_r, p2_g, p2_b);
+            draw_horizontal_line_shaded (renderer, (int) p1_x, (int) p2_x, i, (uint8_t) p1_r, (uint8_t) p1_g, (uint8_t) p1_b, (uint8_t) p2_r, (uint8_t) p2_g, (uint8_t) p2_b);
             
             p1_x += x_1_2;
             p1_r += r_1_2;
@@ -304,7 +304,10 @@ void graphics_renderer_draw_shaded_triangle (graphics_renderer_t *renderer, int 
             p2_b += b_0_2;
         }
     } else {
+        printf ("(%f, %f, %f) (%d, %d, %d)\n", p2_r, p2_g, p2_b, r_2, g_2, b_2);
         draw_horizontal_line_shaded (renderer, (int) p1_x, (int) p2_x, y1, p1_r, p1_g, p1_b, p2_r, p2_g, p2_b);
+            
+        // draw_horizontal_line_shaded (renderer, (int) p1_x, (int) p2_x, y1, p1_r, p1_g, p1_b, p2_r, p2_g, p2_b);
     }
 }
 
