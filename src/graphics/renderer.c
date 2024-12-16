@@ -65,6 +65,12 @@ static void swap_int (int *x, int *y) {
     *y = temp;
 }
 
+static void swap_uint_8 (uint8_t *x, uint8_t *y) {
+    uint8_t temp = *x;
+    *x = *y;
+    *y = temp;
+}
+
 void graphics_renderer_draw_line (graphics_renderer_t *renderer, int x0, int y0, int x1, int y1, uint8_t red, uint8_t green, uint8_t blue) {
     int dx = x1 - x0;
     int dy = y1 - y0;
@@ -109,6 +115,34 @@ static void draw_horizontal_line (graphics_renderer_t *renderer, int x0, int x1,
 
     for (int i = x0; i <= x1; i++) {
         graphics_renderer_draw_pixel (renderer, i, y, red, green, blue);
+    }
+};
+
+static void draw_horizontal_line_shaded (graphics_renderer_t *renderer, int x0, int x1, int y, uint8_t r_1, uint8_t g_1, uint8_t b_1, uint8_t r_2, uint8_t g_2, uint8_t b_2) {
+    if (x0 > x1) {
+        swap_int (&x0, &x1);
+        swap_uint_8 (&r_1, &r_2);
+        swap_uint_8 (&g_1, &g_2);
+        swap_uint_8 (&b_1, &b_2);
+    }
+
+    double r = r_1;
+    double g = g_1;
+    double b = b_1;
+
+    if (x1 > x0) {
+        double dr = (r_2 - r_1) / (double) (x1 - x0);
+        double dg = (g_2 - g_1) / (double) (x1 - x0);
+        double db = (b_2 - b_1) / (double) (x1 - x0);
+        
+        for (int i = x0; i <= x1; i++) {
+            graphics_renderer_draw_pixel (renderer, i, y, r, g, b);
+            r += dr;
+            g += dg;
+            b += db;
+        }
+    } else {
+        graphics_renderer_draw_pixel (renderer, x0, y, r_1, g_1, b_1);
     }
 };
 
@@ -164,6 +198,113 @@ void graphics_renderer_draw_filled_triangle (graphics_renderer_t *renderer, int 
         }
     } else {
         draw_horizontal_line (renderer, (int) p1, (int) p2, y1, red, green, blue);
+    }
+}
+
+void graphics_renderer_draw_shaded_triangle (graphics_renderer_t *renderer, int x0, int y0, int x1, int y1, int x2, int y2, uint8_t r_0, uint8_t g_0, uint8_t b_0, uint8_t r_1, uint8_t g_1, uint8_t b_1, uint8_t r_2, uint8_t g_2, uint8_t b_2) {
+    /* Sort the points in vertical order */
+    if (y1 < y0) {
+        swap_int (&x0, &x1);
+        swap_int (&y0, &y1);
+        swap_uint_8 (&r_0, &r_1);
+        swap_uint_8 (&g_0, &g_1);
+        swap_uint_8 (&b_0, &b_1);
+    }
+
+    if (y2 < y0) {
+        swap_int (&x0, &x2);
+        swap_int (&y0, &y2);
+        swap_uint_8 (&r_0, &r_2);
+        swap_uint_8 (&g_0, &g_2);
+        swap_uint_8 (&b_0, &b_2);
+    }
+
+    if (y2 < y1) {
+        swap_int (&x1, &x2);
+        swap_int (&y1, &y2);
+        swap_uint_8 (&r_1, &r_2);
+        swap_uint_8 (&g_1, &g_2);
+        swap_uint_8 (&b_1, &b_2);
+    }
+
+    /* Compute change in x per unit y for each line 
+       segment. */
+    int dy_0_1 = y1 - y0;
+    int dy_0_2 = y2 - y0;
+    int dy_1_2 = y2 - y1;
+
+    /* Render first half of triangle: (x0, y0) -> (x1, y1) and (x', y1)*/
+    double p1_x = x0;
+    double p2_x = x0;
+    double p1_r = r_0;
+    double p2_r = r_0;
+    double p1_g = g_0;
+    double p2_g = g_0;
+    double p1_b = b_0;
+    double p2_b = b_0;
+        
+    if (y1 > y0) {
+        /* Change in x per unit y */
+        double x_0_1 = (x1 - x0) / (double) dy_0_1;
+        double x_0_2 = (x2 - x0) / (double) dy_0_2;
+
+        /* Change in colours pre unit y */
+        double r_0_1 = (r_1 - r_0) / (double) dy_0_1;
+        double r_0_2 = (r_2 - r_0) / (double) dy_0_2;
+        double g_0_1 = (g_1 - g_0) / (double) dy_0_1;
+        double g_0_2 = (g_2 - g_0) / (double) dy_0_2;
+        double b_0_1 = (b_1 - b_0) / (double) dy_0_1;
+        double b_0_2 = (b_2 - b_0) / (double) dy_0_2;
+    
+        for (int i = y0; i <= y1; i++) {
+            draw_horizontal_line_shaded (renderer, (int) p1_x, (int) p2_x, i, p1_r, p1_g, p1_b, p2_r, p2_g, p2_b);
+            
+            p1_x += x_0_1;
+            p1_r += r_0_1;
+            p1_g += g_0_1;
+            p1_b += b_0_1;
+
+            p2_x += x_0_2;
+            p2_r += r_0_2;
+            p2_g += g_0_2;
+            p2_b += b_0_2;
+        }
+    }
+
+    /* Draw second half of triangle (x1, y1) and (x', y1) -> (x2, y2) */
+    p1_x = x1;
+    p1_r = r_1;
+    p1_g = g_1;
+    p1_b = b_1;
+
+    if (y2 > y1) {
+        /* Change in x per unit y */
+        double x_1_2 = (x2 - x1) / (double) dy_1_2;
+        double x_0_2 = (x2 - x0) / (double) dy_0_2;
+
+        /* Change in colours per unit y */
+        double r_1_2 = (r_2 - r_1) / (double) dy_1_2;
+        double r_0_2 = (r_2 - r_0) / (double) dy_0_2;
+        double g_1_2 = (g_2 - g_1) / (double) dy_1_2;
+        double g_0_2 = (g_2 - g_0) / (double) dy_0_2;
+        double b_1_2 = (b_2 - b_1) / (double) dy_1_2;
+        double b_0_2 = (b_2 - b_0) / (double) dy_0_2;
+    
+        for (int i = y1; i <= y2; i++) {
+            draw_horizontal_line_shaded (renderer, (int) p1_x, (int) p2_x, i, p1_r, p1_g, p1_b, p2_r, p2_g, p2_b);
+            
+            p1_x += x_1_2;
+            p1_r += r_1_2;
+            p1_g += g_1_2;
+            p1_b += b_1_2;
+
+            p2_x += x_0_2;
+            p2_r += r_0_2;
+            p2_g += g_0_2;
+            p2_b += b_0_2;
+        }
+    } else {
+        draw_horizontal_line_shaded (renderer, (int) p1_x, (int) p2_x, y1, p1_r, p1_g, p1_b, p2_r, p2_g, p2_b);
     }
 }
 
