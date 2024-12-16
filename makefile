@@ -11,6 +11,8 @@ OUTPUT = ./build/example_1
 SRC = ./src/examples/hello_world/main.c
 SRC += ./src/system/window_x11.c
 SRC += ./src/graphics/renderer.c
+SRC += ./src/maths/maths.c
+SRC += ./src/resources/resources.c
 
 # Libraries to Link
 LIBS = -lX11 -lm

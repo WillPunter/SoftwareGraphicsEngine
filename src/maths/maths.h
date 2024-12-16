@@ -2,6 +2,7 @@
 #define MATHS_H
 
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 /* Vectors */
@@ -457,5 +458,6 @@ inline maths_mat4x4f maths_4x4f_rotation_z_3d (double angle) {
     return result; 
 }
 
+maths_vec2f maths_project_vertex_3f (double viewing_plane_distance, int buffer_width, int buffer_height, double view_width, double view_height, maths_vec3f v);
 
 #endif

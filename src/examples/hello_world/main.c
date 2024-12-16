@@ -1,6 +1,7 @@
 #include "../../system/window.h"
 #include "../../graphics/renderer.h"
 #include "../../maths/maths.h"
+#include "../../resources/resources.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -24,37 +25,40 @@ int main () {
 
     system_window_set_shown (window, true);
 
+    resources_mesh_t *mesh = resources_load_mesh_from_obj_file ("./build/res/cube.obj");
+    maths_vec3f cube_pos;
+    cube_pos.x = -5;
+    cube_pos.y = 1;
+    cube_pos.z = 15;
+
     is_running = true;
-
-    uint8_t intensity = 0;
-
-    uint32_t x = 0;
-    uint32_t y = 0;
-    double angle = 0;
 
     while (is_running) {
         graphics_renderer_clear_buffer (renderer);
 
-        intensity = (intensity + 1) % 255;
+        for (int i = 0; i < mesh->num_faces; i++) {
+            maths_vec3f v[3];
+            
+            for (int j = 0; j < 3; j++) {
+                //printf ("faces: %d %d %d\n", mesh->faces[i][0], mesh->faces[i][1], mesh->faces[i][j]);
+                v[j] = mesh->vertices[mesh->faces[i][j]].coord;
+                v[j].x += cube_pos.x;
+                v[j].y += cube_pos.y;
+                v[j].z += cube_pos.z;
+            }
 
-        renderer->pixels[640 * y + x].red = 255;
-        renderer->pixels[640 * y + x].green = 0;
-        renderer->pixels[640 * y + x].blue = 0; 
+            printf ("%f %f %f\n", v[0].x, v[1].x, v[2].x);
 
-        graphics_renderer_draw_shaded_triangle (renderer, 100, 200, 200, 300, 300, 300, 255, 0, 0, 0, 255, 0, 0, 0, 255);
+            /* Project vertices */
+            maths_vec2f p[3];
 
-        x = x + 1;
+            for (int j = 0; j < 3; j++) {
+                p[j] = maths_project_vertex_3f (1, 640, 480, 2, 2, v[j]);
+            }
 
-        if (x >= 640) {
-            x = 0;
-            y = (y + 1) % 480;
-        }
+            printf ("px %f %f %f\n", p[0].x, p[1].x, p[2].x);
 
-        angle += 0.001;
-        graphics_renderer_draw_line (renderer, 320, 240, 320 + 100 * cos (angle), 240 + 100 * sin (angle), 0, 255, 0);
-
-        for (int i = 0; i < 100; i++) {
-            renderer->pixels[640 * 400 + i].blue = 255;
+            graphics_renderer_draw_wireframe_triangle (renderer, p[0].x, p[0].y, p[1].x, p[1].y, p[2].x, p[2].y, 0, 0, 255 );
         }
 
         graphics_renderer_display (renderer, window); 
