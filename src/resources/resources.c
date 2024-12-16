@@ -97,14 +97,12 @@ resources_mesh_t *resources_load_mesh_from_obj_file (const char *file_name) {
         int vertex_index = 0;
         int face_index = 0;
 
-        printf ("starting second pass\n");
-
         while (getline (&buff, &len, obj_file) != -1) {
-            printf ("itt\n");
             if (strlen (buff) > 2) {
                 if (buff[0] == 'v' && buff[1] == ' ') {
                     /* Add vertex */
-                    maths_vec3f coord;
+                    maths_vec4f coord;
+                    coord.w = 1;
 
                     if (sscanf (buff + 2, "%lf %lf %lf", &coord.x, &coord.y, &coord.z) == 3) {
                         result->vertices[vertex_index].coord = coord;

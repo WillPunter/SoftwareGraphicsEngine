@@ -37,10 +37,12 @@ void graphics_renderer_clear_buffer (graphics_renderer_t *renderer) {
 };
 
 void graphics_renderer_draw_pixel (graphics_renderer_t *renderer, int x, int y, uint8_t red, uint8_t green, uint8_t blue) {
-    graphics_pixel_t *px = &renderer->pixels[y * renderer->width + x];
-    px->red = red;
-    px->green = green;
-    px->blue = blue;
+    if (x >= 0 && x < renderer->width && y >= 0 && y < renderer->height) {
+        graphics_pixel_t *px = &renderer->pixels[y * renderer->width + x];
+        px->red = red;
+        px->green = green;
+        px->blue = blue;
+    };
 };
 
 static void draw_line_pixel_dx (double x, double y, void *aux1, void *aux2) {
@@ -304,10 +306,7 @@ void graphics_renderer_draw_shaded_triangle (graphics_renderer_t *renderer, int 
             p2_b += b_0_2;
         }
     } else {
-        printf ("(%f, %f, %f) (%d, %d, %d)\n", p2_r, p2_g, p2_b, r_2, g_2, b_2);
         draw_horizontal_line_shaded (renderer, (int) p1_x, (int) p2_x, y1, p1_r, p1_g, p1_b, p2_r, p2_g, p2_b);
-            
-        // draw_horizontal_line_shaded (renderer, (int) p1_x, (int) p2_x, y1, p1_r, p1_g, p1_b, p2_r, p2_g, p2_b);
     }
 }
 
@@ -327,5 +326,40 @@ static void interpolate (double i0, double d0, double i1, double d1, void (*func
     for (double i = i0; i <= i1; i++) {
         func (i, d, aux1, aux2);
         d += gradient;
+    }
+};
+
+void graphics_renderer_render_model (graphics_renderer_t *renderer, resources_model_t *model, graphics_camera_t *camera) {
+    /* Compute transformation matrix*/
+
+    /* Transform from model space into world space */
+    maths_mat4x4f transform = maths_model_transform (model->position, model->scale, model->rotation);
+
+    /* To transform from world space to camera space, we
+       need to first translate by the negative of the camera
+       position, then rotate by the inverse of the camera angle
+       and then scale by the camera scale. */
+    maths_mat4x4f camera_transform = maths_4x4f_translation_3d (-camera->position.x, -camera->position.y, -camera->position.z);
+    camera_transform = maths_mat4x4f_mul(maths_4x4f_rotation_yxz_3d (-camera->rotation.x, -camera->rotation.y, -camera->rotation.z), camera_transform);
+
+    transform = maths_mat4x4f_mul (camera_transform, transform);
+
+    for (int i = 0; i < model->mesh->num_faces; i++) {
+        maths_vec4f v1 = model->mesh->vertices[model->mesh->faces[i][0]].coord;
+        maths_vec4f v2 = model->mesh->vertices[model->mesh->faces[i][1]].coord;
+        maths_vec4f v3 = model->mesh->vertices[model->mesh->faces[i][2]].coord;
+        v1.w = 1;
+        v2.w = 1;
+        v3.w = 1;
+
+        v1 = maths_mat4x4f_mul_vec4f (transform, v1);
+        v2 = maths_mat4x4f_mul_vec4f (transform, v2);
+        v3 = maths_mat4x4f_mul_vec4f (transform, v3);
+
+        maths_vec2f p1 = maths_project_vertex_4f_3d (renderer->view_distance, renderer->width, renderer->height, renderer->view_width, renderer->view_height, v1);
+        maths_vec2f p2 = maths_project_vertex_4f_3d (renderer->view_distance, renderer->width, renderer->height, renderer->view_width, renderer->view_height, v2);
+        maths_vec2f p3 = maths_project_vertex_4f_3d (renderer->view_distance, renderer->width, renderer->height, renderer->view_width, renderer->view_height, v3);
+
+        graphics_renderer_draw_wireframe_triangle (renderer, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, 0, 0, 255);
     }
 };

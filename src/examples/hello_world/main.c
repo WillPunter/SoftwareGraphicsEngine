@@ -18,6 +18,9 @@ int main () {
 
     system_window_t *window = system_window_create ("Hello World!!!", 640, 480, true);
     graphics_renderer_t *renderer = graphics_renderer_init (640, 480);
+    renderer->view_distance = 1;
+    renderer->view_width = 2;
+    renderer->view_height = 2;
 
     assert (window != NULL);
 
@@ -26,40 +29,27 @@ int main () {
     system_window_set_shown (window, true);
 
     resources_mesh_t *mesh = resources_load_mesh_from_obj_file ("./build/res/cube.obj");
-    maths_vec3f cube_pos;
-    cube_pos.x = -5;
-    cube_pos.y = 1;
-    cube_pos.z = 15;
+
+    resources_model_t cube_model;
+    cube_model.mesh = mesh;
+    cube_model.position = (maths_vec4f) { -5.0, 1.0, 15.0, 1.0 };
+    cube_model.scale = (maths_vec4f) { 1.0, 1.0, 1.0, 1.0 };
+    cube_model.rotation = (maths_vec4f) { 0.0, 0.0, 0.0, 0.0 };
+
+    graphics_camera_t camera;
+    camera.position = (maths_vec4f) { 0.0, 0.0, 0.0, 1.0 };
+    camera.scale = (maths_vec4f) { 1.0, 1.0, 1.0, 1.0 };
+    camera.rotation = (maths_vec4f) { 0.0, 0.0, 0.0 };
 
     is_running = true;
 
     while (is_running) {
         graphics_renderer_clear_buffer (renderer);
 
-        for (int i = 0; i < mesh->num_faces; i++) {
-            maths_vec3f v[3];
-            
-            for (int j = 0; j < 3; j++) {
-                //printf ("faces: %d %d %d\n", mesh->faces[i][0], mesh->faces[i][1], mesh->faces[i][j]);
-                v[j] = mesh->vertices[mesh->faces[i][j]].coord;
-                v[j].x += cube_pos.x;
-                v[j].y += cube_pos.y;
-                v[j].z += cube_pos.z;
-            }
-
-            printf ("%f %f %f\n", v[0].x, v[1].x, v[2].x);
-
-            /* Project vertices */
-            maths_vec2f p[3];
-
-            for (int j = 0; j < 3; j++) {
-                p[j] = maths_project_vertex_3f (1, 640, 480, 2, 2, v[j]);
-            }
-
-            printf ("px %f %f %f\n", p[0].x, p[1].x, p[2].x);
-
-            graphics_renderer_draw_wireframe_triangle (renderer, p[0].x, p[0].y, p[1].x, p[1].y, p[2].x, p[2].y, 0, 0, 255 );
-        }
+        //cube_model.rotation.x += 0.001;
+        cube_model.rotation.x += 0.0005;
+        camera.rotation.y += 0.01;
+        graphics_renderer_render_model (renderer, &cube_model, &camera);
 
         graphics_renderer_display (renderer, window); 
 
