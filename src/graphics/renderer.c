@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void interpolate (double i0, double d0, double i1, double d1, void *(*func)(double, double, void *), void *aux);
+
 graphics_renderer_t *graphics_renderer_init (unsigned int width, unsigned int height) {
     graphics_renderer_t *renderer = (graphics_renderer_t *) malloc (sizeof (graphics_renderer_t));
 
@@ -39,4 +41,23 @@ void graphics_renderer_draw_pixel (graphics_renderer_t *renderer, int x, int y, 
     px->red = red;
     px->green = green;
     px->blue = blue;
+};
+
+/* Iterpolate over the independent variable, adjusting
+   the dependent variable accordingly. */
+static void interpolate (double i0, double d0, double i1, double d1, void *(*func)(double, double, void *), void *aux) {
+    /* If there is no change in i, then
+       simply call the function for i0, d0. */
+    if (i0 == i1) {
+        func (i0, d0, aux);
+        return;
+    }
+    
+    double gradient = (d1 - d0) / (i1 - i0);
+    double d = d0;
+
+    for (double i = i0; i <= i1; i++) {
+        func (i, d, aux);
+        d += gradient;
+    }
 };
