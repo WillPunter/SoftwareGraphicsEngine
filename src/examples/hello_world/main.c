@@ -30,6 +30,7 @@ int main () {
 
     uint32_t x = 0;
     uint32_t y = 0;
+    double angle = 0;
 
     while (is_running) {
         graphics_renderer_clear_buffer (renderer);
@@ -46,6 +47,9 @@ int main () {
             x = 0;
             y = (y + 1) % 480;
         }
+
+        angle += 0.001;
+        graphics_renderer_draw_line (renderer, 320, 240, 320 + 100 * cos (angle), 240 + 100 * sin (angle), 0, 255, 0);
 
         for (int i = 0; i < 100; i++) {
             renderer->pixels[640 * 400 + i].blue = 255;

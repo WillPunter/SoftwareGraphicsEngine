@@ -13,7 +13,7 @@ SRC += ./src/system/window_x11.c
 SRC += ./src/graphics/renderer.c
 
 # Libraries to Link
-LIBS = -lX11
+LIBS = -lX11 -lm
 
 # Build the executable
 $(OUTPUT): $(SRC)
