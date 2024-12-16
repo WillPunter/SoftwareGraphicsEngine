@@ -59,6 +59,12 @@ static void draw_line_pixel_dy (double x, double y, void *aux1, void *aux2) {
     graphics_renderer_draw_pixel (renderer, x_i, y_i, pixel->red, pixel->green, pixel->blue);
 };
 
+static void swap_int (int *x, int *y) {
+    int temp = *x;
+    *x = *y;
+    *y = temp;
+}
+
 void graphics_renderer_draw_line (graphics_renderer_t *renderer, int x0, int y0, int x1, int y1, uint8_t red, uint8_t green, uint8_t blue) {
     int dx = x1 - x0;
     int dy = y1 - y0;
@@ -73,13 +79,8 @@ void graphics_renderer_draw_line (graphics_renderer_t *renderer, int x0, int y0,
            Interpolate with respect to dx from left to
            right. */
         if (x0 > x1) {
-            int temp = x0;
-            x0 = x1;
-            x1 = temp;
-
-            temp = y0;
-            y0 = y1;
-            y1 = temp;
+            swap_int (&x0, &x1);
+            swap_int (&y0, &y1);
         }
 
         interpolate (x0, y0, x1, y1, draw_line_pixel_dx, (void*) renderer, (void*) &px);
@@ -87,19 +88,84 @@ void graphics_renderer_draw_line (graphics_renderer_t *renderer, int x0, int y0,
         /* Line is closer to vertical than horizontal.
         Interpolate with respect to dy. */
         if (y0 > y1) {
-            int temp = x0;
-            x0 = x1;
-            x1 = temp;
-
-            temp = y0;
-            y0 = y1;
-            y1 = temp;
+            swap_int (&x0, &x1);
+            swap_int (&y0, &y1);
         }
 
         interpolate (y0, x0, y1, x1, draw_line_pixel_dy, (void*) renderer, (void*) &px);
     }
 }
 
+void graphics_renderer_draw_wireframe_triangle (graphics_renderer_t *renderer, int x0, int y0, int x1, int y1, int x2, int y2, uint8_t red, uint8_t green, uint8_t blue) {
+    graphics_renderer_draw_line (renderer, x0, y0, x1, y1, red, green, blue);
+    graphics_renderer_draw_line (renderer, x1, y1, x2, y2, red, green, blue);
+    graphics_renderer_draw_line (renderer, x2, y2, x0, y0, red, green, blue);   
+};
+
+static void draw_horizontal_line (graphics_renderer_t *renderer, int x0, int x1, int y, uint8_t red, uint8_t green, uint8_t blue) {
+    if (x0 > x1) {
+        swap_int (&x0, &x1);
+    }
+
+    for (int i = x0; i <= x1; i++) {
+        graphics_renderer_draw_pixel (renderer, i, y, red, green, blue);
+    }
+};
+
+void graphics_renderer_draw_filled_triangle (graphics_renderer_t *renderer, int x0, int y0, int x1, int y1, int x2, int y2, uint8_t red, uint8_t green, uint8_t blue) {
+    /* Sort the points in vertical order */
+    if (y1 < y0) {
+        swap_int (&x0, &x1);
+        swap_int (&y0, &y1);
+    }
+
+    if (y2 < y0) {
+        swap_int (&x0, &x2);
+        swap_int (&y0, &y2);
+    }
+
+    if (y2 < y1) {
+        swap_int (&x1, &x2);
+        swap_int (&y1, &y2);
+    }
+
+    /* Compute change in x per unit y for each line 
+       segment. */
+    int dy_0_1 = y1 - y0;
+    int dy_0_2 = y2 - y0;
+    int dy_1_2 = y2 - y1;
+
+    /* Render first half of triangle: (x0, y0) -> (x1, y1) and (x', y1)*/
+    double p1 = x0;
+    double p2 = x0;
+        
+    if (y1 > y0) {
+        double x_0_1 = (x1 - x0) / (double) dy_0_1;
+        double x_0_2 = (x2 - x0) / (double) dy_0_2;
+    
+        for (int i = y0; i <= y1; i++) {
+            draw_horizontal_line (renderer, (int) p1, (int) p2, i, red, green, blue);
+            p1 += x_0_1;
+            p2 += x_0_2;
+        }
+    }
+
+    /* Draw second half of triangle (x1, y1) and (x', y1) -> (x2, y2) */
+    p1 = x1;
+
+    if (y2 > y1) {
+        double x_1_2 = (x2 - x1) / (double) dy_1_2;
+        double x_0_2 = (x2 - x0) / (double) dy_0_2;
+
+        for (int i = y1; i <= y2; i++) {
+            draw_horizontal_line (renderer, (int) p1, (int) p2, i, red, green, blue);
+            p1 += x_1_2;
+            p2 += x_0_2;
+        }
+    } else {
+        draw_horizontal_line (renderer, (int) p1, (int) p2, y1, red, green, blue);
+    }
+}
 
 /* Iterpolate over the independent variable, adjusting
    the dependent variable accordingly. */

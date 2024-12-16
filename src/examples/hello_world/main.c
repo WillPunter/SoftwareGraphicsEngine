@@ -41,6 +41,8 @@ int main () {
         renderer->pixels[640 * y + x].green = 0;
         renderer->pixels[640 * y + x].blue = 0; 
 
+        graphics_renderer_draw_filled_triangle (renderer, 100, 100, 400, 200, 200, 200, 0, 0, 255);
+
         x = x + 1;
 
         if (x >= 640) {
