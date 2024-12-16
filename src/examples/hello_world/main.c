@@ -1,5 +1,6 @@
 #include "../../system/window.h"
 #include "../../graphics/renderer.h"
+#include "../../maths/maths.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
