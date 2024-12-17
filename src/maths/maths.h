@@ -24,6 +24,8 @@ typedef struct {
     double w;
 } maths_vec4f;
 
+typedef maths_vec4f maths_triangle4f[3];
+
 /* Matrices 
     
    Note that, for consistency with other

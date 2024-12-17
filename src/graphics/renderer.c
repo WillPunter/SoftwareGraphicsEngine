@@ -5,7 +5,18 @@
 #include <string.h>
 
 static void interpolate (double i0, double d0, double i1, double d1, void (*func)(double, double, void *, void *), void *aux1, void *aux2);
- 
+static bool same_side_of_plane (maths_vec4f p1, maths_vec4f p2, maths_vec4f plane_point, maths_vec4f plane_dir_1, maths_vec4f plane_dir_2);
+static bool line_plane_intersect (maths_vec4f start, maths_vec4f dir, maths_vec4f plane_point, maths_vec4f plane_dir_1, maths_vec4f plane_dir_2, maths_vec4f *result);
+static void clip_triangle_1_in (maths_vec4f *in, maths_vec4f *out_1, maths_vec4f *out_2, maths_vec4f plane_point, maths_vec4f plane_dir_1, maths_vec4f plane_dir_2, maths_vec4f *in_res, maths_vec4f *out_1_res, maths_vec4f *out_2_res);
+static void clip_triangle_2_in (maths_vec4f *in_1, maths_vec4f *in_2, maths_vec4f *out, maths_vec4f plane_point, maths_vec4f plane_dir_1, maths_vec4f plane_dir_2, maths_vec4f *t_1_in_1_res, maths_vec4f *t_1_in_2_res, maths_vec4f *t_1_out_res, maths_vec4f *t_2_in_1_res, maths_vec4f *t_2_in_2_res, maths_vec4f *t_2_out_res);
+static void clip_view_plane (graphics_renderer_t *renderer, maths_triangle4f t);
+static void project_and_draw_triangle (graphics_renderer_t *renderer, maths_triangle4f t);
+static void clip_view_plane (graphics_renderer_t *renderer, maths_triangle4f t);
+static void clip_left_plane (graphics_renderer_t *renderer, maths_triangle4f t);
+static void clip_right_plane (graphics_renderer_t *renderer, maths_triangle4f t);
+static void clip_bottom_plane (graphics_renderer_t *renderer, maths_triangle4f t);
+static void clip_top_plane (graphics_renderer_t *renderer, maths_triangle4f t);
+
 graphics_renderer_t *graphics_renderer_init (unsigned int width, unsigned int height) {
     graphics_renderer_t *renderer = (graphics_renderer_t *) malloc (sizeof (graphics_renderer_t));
 
@@ -330,8 +341,6 @@ static void interpolate (double i0, double d0, double i1, double d1, void (*func
 };
 
 void graphics_renderer_render_model (graphics_renderer_t *renderer, resources_model_t *model, graphics_camera_t *camera) {
-    /* Compute transformation matrix*/
-
     /* Transform from model space into world space */
     maths_mat4x4f transform = maths_model_transform (model->position, model->scale, model->rotation);
 
@@ -356,10 +365,313 @@ void graphics_renderer_render_model (graphics_renderer_t *renderer, resources_mo
         v2 = maths_mat4x4f_mul_vec4f (transform, v2);
         v3 = maths_mat4x4f_mul_vec4f (transform, v3);
 
-        maths_vec2f p1 = maths_project_vertex_4f_3d (renderer->view_distance, renderer->width, renderer->height, renderer->view_width, renderer->view_height, v1);
-        maths_vec2f p2 = maths_project_vertex_4f_3d (renderer->view_distance, renderer->width, renderer->height, renderer->view_width, renderer->view_height, v2);
-        maths_vec2f p3 = maths_project_vertex_4f_3d (renderer->view_distance, renderer->width, renderer->height, renderer->view_width, renderer->view_height, v3);
+        /* vertices are now in camera space - clip them */
+        maths_triangle4f t = {v1, v2, v3};
+        clip_view_plane (renderer, t);
 
-        graphics_renderer_draw_wireframe_triangle (renderer, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, 0, 0, 255);
+        //maths_vec2f p1 = maths_project_vertex_4f_3d (renderer->view_distance, renderer->width, renderer->height, renderer->view_width, renderer->view_height, v1);
+        //maths_vec2f p2 = maths_project_vertex_4f_3d (renderer->view_distance, renderer->width, renderer->height, renderer->view_width, renderer->view_height, v2);
+        //maths_vec2f p3 = maths_project_vertex_4f_3d (renderer->view_distance, renderer->width, renderer->height, renderer->view_width, renderer->view_height, v3);
+
+        //graphics_renderer_draw_wireframe_triangle (renderer, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, 0, 0, 255);
     }
 };
+
+static bool same_side_of_plane (
+    maths_vec4f p1,
+    maths_vec4f p2,
+    maths_vec4f plane_point,
+    maths_vec4f plane_dir_1,
+    maths_vec4f plane_dir_2
+) {
+    /* Get perpendicular vector */
+    maths_vec4f perp = maths_vec4f_cross_3d (plane_dir_1, plane_dir_2);
+
+    /* Get projected distance of each point */
+    maths_vec4f p1_p0 = maths_vec4f_sub (p1, plane_point);
+    maths_vec4f p2_p0 = maths_vec4f_sub (p2, plane_point);
+
+    double d1 = maths_vec4f_dot (p1_p0, perp);
+    double d2 = maths_vec4f_dot (p2_p0, perp);
+
+    return d1 * d2 >= 0;
+}
+
+static bool line_plane_intersect (
+    maths_vec4f start,
+    maths_vec4f dir,
+    maths_vec4f plane_point,
+    maths_vec4f plane_dir_1,
+    maths_vec4f plane_dir_2,
+    maths_vec4f *result
+) {
+    /* start + k * dir is on the plane
+       Thus (start + k *dir - plane_point) . normal = 0
+       Thus k * (dir . normal) + (start - plane_point) . normal = 0
+       k = - (start - plane_point) . normal / (dir . normal)
+       */
+    maths_vec4f perp = maths_vec4f_cross_3d (plane_dir_1, plane_dir_2);
+
+    double numerator = -1.0 * maths_vec4f_dot (maths_vec4f_sub (start, plane_point), perp);
+    double denominator = maths_vec4f_dot (dir, perp);
+
+    if (denominator == 0) {
+        return false;
+    }
+
+    double scale = numerator / denominator;
+
+    *result = maths_vec4f_add (start, maths_vec4f_scale (dir, scale));
+    return true;
+}
+
+static void clip_triangle_1_in (
+    maths_vec4f *in,
+    maths_vec4f *out_1,
+    maths_vec4f *out_2,
+    maths_vec4f plane_point,
+    maths_vec4f plane_dir_1,
+    maths_vec4f plane_dir_2,
+    maths_vec4f *in_res,
+    maths_vec4f *out_1_res, 
+    maths_vec4f *out_2_res
+) {
+    *in_res = *in;
+
+    maths_vec4f dir_0_1 = maths_vec4f_sub (*out_1, *in);
+    maths_vec4f dir_0_2 = maths_vec4f_sub (*out_2, *in);
+
+    maths_vec4f t_0_1_int;
+    maths_vec4f t_0_2_int;
+    bool intersect_1 = line_plane_intersect (*in, dir_0_1, plane_point, plane_dir_1, plane_dir_2, &t_0_1_int);
+    bool intersect_2 = line_plane_intersect (*in, dir_0_2, plane_point, plane_dir_1, plane_dir_2, &t_0_2_int);
+
+    assert (intersect_1 && intersect_2);
+
+    *out_1_res = t_0_1_int;
+    *out_2_res = t_0_2_int;
+}
+
+static void clip_triangle_2_in (
+    maths_vec4f *in_1,
+    maths_vec4f *in_2,
+    maths_vec4f *out,
+    maths_vec4f plane_point,
+    maths_vec4f plane_dir_1,
+    maths_vec4f plane_dir_2,
+    maths_vec4f *t_1_in_1_res,
+    maths_vec4f *t_1_in_2_res,
+    maths_vec4f *t_1_out_res,
+    maths_vec4f *t_2_in_1_res,
+    maths_vec4f *t_2_in_2_res,
+    maths_vec4f *t_2_out_res
+) {
+    maths_vec4f d_1_0 = maths_vec4f_sub (*out, *in_1);
+    maths_vec4f d_2_0 = maths_vec4f_sub (*out, *in_2);
+
+    /* find intersection from */
+    maths_vec4f int_1;
+    bool is_int_1 = line_plane_intersect (*in_1, d_1_0, plane_point, plane_dir_1, plane_dir_2, &int_1);
+    maths_vec4f int_2;
+    bool is_int_2 = line_plane_intersect (*in_2, d_2_0, plane_point, plane_dir_1, plane_dir_2, &int_2);
+
+    assert (is_int_1 && is_int_2);
+
+    *t_1_out_res = int_1;
+    *t_1_in_1_res = *in_1;
+    *t_1_in_2_res = *in_2;
+
+    *t_2_out_res = int_2;
+    *t_2_in_1_res = *in_1;
+    *t_2_in_2_res = *in_2;
+}
+
+static int clip_triangle_plane (
+    maths_triangle4f t,
+    maths_vec4f plane_point,
+    maths_vec4f plane_dir_1,
+    maths_vec4f plane_dir_2,
+    maths_vec4f sample,
+    maths_triangle4f t1,
+    maths_triangle4f t2
+) {
+    /* Precondition - the sample point is within
+       the "in" part of the viewing frustum, i.e.
+       it is within visible space. */
+
+    /* Check which vertices of the triangle are on the same
+       side of the plane as the sample. */
+    bool in_view[3];
+
+    in_view[0] = same_side_of_plane (t[0], sample, plane_point, plane_dir_1, plane_dir_2);
+    in_view[1] = same_side_of_plane (t[1], sample, plane_point, plane_dir_1, plane_dir_2);
+    in_view[2] = same_side_of_plane (t[2], sample, plane_point, plane_dir_1, plane_dir_2);
+
+    /* If all vertices are outside of plane,
+       discard triangle entirely */
+    if (!in_view[0] && !in_view[1] && !in_view[2]) {
+        return 0;
+    }
+
+    /* If all vertices are outside of plane,
+       keep entire triangle */
+    if (in_view[0] && in_view[1] && in_view[2]) {
+        t1[0] = t[0];
+        t1[1] = t[1];
+        t1[2] = t[2];
+        return 1;
+    }
+
+    /* If 2 vertices are outside the plane, clip
+       one triangle */
+    if (in_view[0] && !in_view[1] && !in_view[2]) {
+        clip_triangle_1_in (&t[0], &t[1], &t[2], plane_point, plane_dir_1, plane_dir_2, &t1[0], &t1[1], &t1[2]);
+        return 1;
+    }
+
+    if (!in_view[0] && in_view[1] && !in_view[2]) {
+        clip_triangle_1_in (&t[1], &t[0], &t[2], plane_point, plane_dir_1, plane_dir_2, &t1[1], &t1[0], &t1[2]);
+        return 1;
+    }
+
+    if (!in_view[0] && !in_view[1] && in_view[2]) {
+        clip_triangle_1_in (&t[2], &t[1], &t[0], plane_point, plane_dir_1, plane_dir_2, &t1[2], &t1[1], &t1[0]);
+        return 1;
+    }
+
+    /* If 1 vertex is outside the plane, we must split into two triangles. */
+    if (!in_view[0]) {
+        clip_triangle_2_in (&t[1], &t[2], &t[0], plane_point, plane_dir_1, plane_dir_2, &t1[1], &t1[2], &t1[0], &t2[1], &t2[2], &t2[0]);
+        return 2;
+    }
+
+    if (!in_view[0]) {
+        clip_triangle_2_in (&t[1], &t[2], &t[0], plane_point, plane_dir_1, plane_dir_2, &t1[1], &t1[2], &t1[0], &t2[1], &t2[2], &t2[0]);
+        return 2;
+    }
+
+    if (!in_view[1]) {
+        clip_triangle_2_in (&t[0], &t[2], &t[1], plane_point, plane_dir_1, plane_dir_2, &t1[0], &t1[2], &t1[1], &t2[0], &t2[2], &t2[1]);
+        return 2;
+    }
+
+    if (!in_view[2]) {
+        clip_triangle_2_in (&t[2], &t[0], &t[1], plane_point, plane_dir_1, plane_dir_2, &t1[2], &t1[0], &t1[1], &t2[2], &t2[0], &t2[1]);
+        return 2;
+    }
+
+    return 0;
+}
+
+/* Clipping pipeline - clip against back plane */
+static void clip_view_plane (graphics_renderer_t *renderer, maths_triangle4f t) {
+    maths_vec4f plane_point = (maths_vec4f) { 0.0, 0.0, renderer->view_distance, 1.0 };
+    maths_vec4f plane_dir_1 = (maths_vec4f) { 1.0, 0.0, 0.0, 0.0 };
+    maths_vec4f plane_dir_2 = (maths_vec4f) { 0.0, 1.0, 0.0, 0.0 };
+    maths_vec4f sample = (maths_vec4f) { 0.0, 0.0, renderer->view_distance + 1.0, 1.0 };   
+    
+    maths_triangle4f o1;
+    maths_triangle4f o2;
+    int n = clip_triangle_plane (t, plane_point, plane_dir_1, plane_dir_2, sample, o1, o2);
+
+    if (n == 1) {
+        /* Send 1 triangle to the next stage of the pipeline */
+        clip_left_plane (renderer, o1);
+    } else if (n == 2) {
+        /* Send 2 triangles to the next stage of the pipeline */
+        clip_left_plane (renderer, o1);
+        clip_left_plane (renderer, o2);
+    }
+}
+
+static void clip_left_plane (graphics_renderer_t *renderer, maths_triangle4f t) {
+    maths_vec4f plane_point = (maths_vec4f) { 0.0, 0.0, 0.0, 1.0 };
+    maths_vec4f plane_dir_1 = (maths_vec4f) { -renderer->view_width / 2, 0.0, renderer->view_distance, 0.0 };
+    maths_vec4f plane_dir_2 = (maths_vec4f) { 0.0, 1.0, 0.0, 0.0 };
+    maths_vec4f sample = (maths_vec4f) { 0.0, 0.0, renderer->view_distance + 1.0, 1.0 };   
+    
+    maths_triangle4f o1;
+    maths_triangle4f o2;
+    int n = clip_triangle_plane (t, plane_point, plane_dir_1, plane_dir_2, sample, o1, o2);
+
+    if (n == 1) {
+        /* Send 1 triangle to the next stage of the pipeline */
+        clip_right_plane (renderer, o1);
+    } else if (n == 2) {
+        /* Send 2 triangles to the next stage of the pipeline */
+        clip_right_plane (renderer, o1);
+        clip_right_plane (renderer, o2);
+    }
+}
+
+static void clip_right_plane (graphics_renderer_t *renderer, maths_triangle4f t) {
+    maths_vec4f plane_point = (maths_vec4f) { 0.0, 0.0, 0.0, 1.0 };
+    maths_vec4f plane_dir_1 = (maths_vec4f) { renderer->view_width / 2, 0.0, renderer->view_distance, 0.0 };
+    maths_vec4f plane_dir_2 = (maths_vec4f) { 0.0, 1.0, 0.0, 0.0 };
+    maths_vec4f sample = (maths_vec4f) { 0.0, 0.0, renderer->view_distance + 1.0, 1.0 }; 
+    
+    maths_triangle4f o1;
+    maths_triangle4f o2;
+    int n = clip_triangle_plane (t, plane_point, plane_dir_1, plane_dir_2, sample, o1, o2);
+
+    if (n == 1) {
+        /* Send 1 triangle to the next stage of the pipeline */
+        clip_bottom_plane (renderer, o1);
+    } else if (n == 2) {
+        /* Send 2 triangles to the next stage of the pipeline */
+        clip_bottom_plane (renderer, o1);
+        clip_bottom_plane (renderer, o2);
+    }
+}
+
+static void clip_bottom_plane (graphics_renderer_t *renderer, maths_triangle4f t) {
+    maths_vec4f plane_point = (maths_vec4f) { 0.0, 0.0, 0.0, 1.0 };
+    maths_vec4f plane_dir_1 = (maths_vec4f) { 0.0, -renderer->view_height / 2, renderer->view_distance, 0.0 };
+    maths_vec4f plane_dir_2 = (maths_vec4f) { 1.0, 0.0, 0.0, 0.0 };
+    maths_vec4f sample = (maths_vec4f) { 0.0, 0.0, renderer->view_distance + 1.0, 1.0 }; 
+    
+    maths_triangle4f o1;
+    maths_triangle4f o2;
+    int n = clip_triangle_plane (t, plane_point, plane_dir_1, plane_dir_2, sample, o1, o2);
+
+    if (n == 1) {
+        /* Send 1 triangle to the next stage of the pipeline */
+        clip_top_plane (renderer, o1);
+    } else if (n == 2) {
+        /* Send 2 triangles to the next stage of the pipeline */
+        clip_top_plane (renderer, o1);
+        clip_top_plane (renderer, o2);
+    }
+}
+
+static void clip_top_plane (graphics_renderer_t *renderer, maths_triangle4f t) {
+    maths_vec4f plane_point = (maths_vec4f) { 0.0, 0.0, 0.0, 1.0 };
+    maths_vec4f plane_dir_1 = (maths_vec4f) { 0.0, renderer->view_height / 2, renderer->view_distance, 0.0 };
+    maths_vec4f plane_dir_2 = (maths_vec4f) { 1.0, 0.0, 0.0, 0.0 };
+    maths_vec4f sample = (maths_vec4f) { 0.0, 0.0, renderer->view_distance + 1.0, 1.0 }; 
+    
+    maths_triangle4f o1;
+    maths_triangle4f o2;
+    int n = clip_triangle_plane (t, plane_point, plane_dir_1, plane_dir_2, sample, o1, o2);
+
+    if (n == 1) {
+        /* Send 1 triangle to the next stage of the pipeline */
+        project_and_draw_triangle (renderer, o1);
+    } else if (n == 2) {
+        /* Send 2 triangles to the next stage of the pipeline */
+        project_and_draw_triangle (renderer, o1);
+        project_and_draw_triangle (renderer, o2);
+    }
+}
+
+static void project_and_draw_triangle (graphics_renderer_t *renderer, maths_triangle4f t) {
+    maths_vec2f p[3];
+
+    for (int i = 0; i < 3; i++) {
+        p[i] = maths_project_vertex_4f_3d (renderer->view_distance, renderer->width, renderer->height, renderer->view_width, renderer->view_height, t[i]);
+        printf ("(%f, %f, %f) -> (%f, %f)\n", t[i].x, t[i].y, t[i].z, p[i].x, p[i].y);
+    };
+
+    printf ("trying to render (%f, %f), (%f, %f), (%f, %f)\n", p[0].x, p[0].y, p[1].x, p[1].y, p[2].x, p[2].y);
+    graphics_renderer_draw_wireframe_triangle (renderer, p[0].x, p[0].y, p[1].x, p[1].y, p[2].x, p[2].y, 0, 0, 255);
+}

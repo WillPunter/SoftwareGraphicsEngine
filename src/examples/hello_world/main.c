@@ -46,10 +46,12 @@ int main () {
     while (is_running) {
         graphics_renderer_clear_buffer (renderer);
 
+        printf ("going to rener cube\n");
         //cube_model.rotation.x += 0.001;
         cube_model.rotation.x += 0.0005;
         camera.rotation.y += 0.01;
         graphics_renderer_render_model (renderer, &cube_model, &camera);
+        printf ("rendererd cube\n");
 
         graphics_renderer_display (renderer, window); 
 
